@@ -1,19 +1,20 @@
-const DEFAULT_TRANSITION = Symbol();
+const DEFAULT = Symbol();
+
+type Action = (char?: string) => void;
+
+type State = string;
 
 type Transitions = {
-  [curState: string]: {
-    [key: string]: [string, Function];
-    [DEFAULT_TRANSITION]: [string, Function];
+  [curState: State]: {
+    [key: string]: [State, Action];
+    [DEFAULT]: [State, Action];
   };
 };
 
 class FiniteStateMachine {
-  private state: string;
+  private state: State;
 
-  constructor(
-    readonly initialState: string,
-    readonly transitions: Transitions
-  ) {
+  constructor(readonly initialState: State, readonly transitions: Transitions) {
     this.state = initialState;
   }
 
@@ -21,21 +22,19 @@ class FiniteStateMachine {
     const curState = this.state;
     const curStateTransitions = this.transitions[curState];
     if (!curStateTransitions) {
-      throw new Error(
-        `Transitions not defined for curState: ${curState}. key: ${key}.`
-      );
+      throw new Error(`Transitions not defined for curState: ${curState}.`);
     }
     const [nextState, action] =
-      curStateTransitions[key] || curStateTransitions[DEFAULT_TRANSITION];
+      curStateTransitions[key] || curStateTransitions[DEFAULT];
     this.state = nextState;
     action(key);
   }
 }
 
-enum State {
-  NotInString = "NotInString,",
-  InString = "InString,",
-  Escape = "Escape,",
+enum StringState {
+  LookForString = "LookForString",
+  InString = "InString",
+  CopyNextChar = "CopyNextChar",
 }
 
 const testString = `Not string, "but this is a string \\"and escaped\\" string" but again not a string`;
@@ -43,38 +42,36 @@ const testString = `Not string, "but this is a string \\"and escaped\\" string" 
 const stringExtractor = (str: string) => {
   let currentString: string[] = [];
 
+  const noop = () => {};
+  const startNewString = () => {
+    currentString = [];
+  };
+  const appendToString = (char?: string) => {
+    char && currentString.push(char);
+  };
+  const printString = () => {
+    console.log(currentString.join(""));
+  };
+
   const transitions: Transitions = {
-    [State.NotInString]: {
-      '"': [State.InString, () => {}],
-      [DEFAULT_TRANSITION]: [State.NotInString, () => {}],
+    [StringState.LookForString]: {
+      '"': [StringState.InString, startNewString],
+      [DEFAULT]: [StringState.LookForString, noop],
     },
-    [State.InString]: {
-      '"': [
-        State.NotInString,
-        () => {
-          console.log(currentString.join(""));
-          currentString = [];
-        },
-      ],
-      "\\": [State.Escape, () => {}],
-      [DEFAULT_TRANSITION]: [
-        State.InString,
-        (char: string) => {
-          currentString.push(char);
-        },
-      ],
+    [StringState.InString]: {
+      '"': [StringState.LookForString, printString],
+      "\\": [StringState.CopyNextChar, noop],
+      [DEFAULT]: [StringState.InString, appendToString],
     },
-    [State.Escape]: {
-      [DEFAULT_TRANSITION]: [
-        State.InString,
-        (char: string) => {
-          currentString.push(char);
-        },
-      ],
+    [StringState.CopyNextChar]: {
+      [DEFAULT]: [StringState.InString, appendToString],
     },
   };
 
-  const stringFSM = new FiniteStateMachine(State.NotInString, transitions);
+  const stringFSM = new FiniteStateMachine(
+    StringState.LookForString,
+    transitions
+  );
 
   for (const c of str) {
     stringFSM.handle(c);
