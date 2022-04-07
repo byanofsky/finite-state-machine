@@ -2,19 +2,17 @@ const DEFAULT = Symbol();
 
 type Action = (char?: string) => void;
 
-type State = string;
-
-type Transitions = {
-  [curState: State]: {
-    [key: string]: [State, Action];
-    [DEFAULT]: [State, Action];
+type Transitions<T extends string> = {
+  [K in T]?: {
+    [key: string]: [T, Action];
+    [DEFAULT]: [T, Action];
   };
 };
 
-class FiniteStateMachine {
-  private state: State;
+class FiniteStateMachine<T extends string> {
+  private state: T;
 
-  constructor(readonly initialState: State, readonly transitions: Transitions) {
+  constructor(readonly initialState: T, readonly transitions: Transitions<T>) {
     this.state = initialState;
   }
 
@@ -53,7 +51,7 @@ const stringExtractor = (str: string) => {
     console.log(currentString.join(""));
   };
 
-  const transitions: Transitions = {
+  const transitions: Transitions<StringState> = {
     [StringState.LookForString]: {
       '"': [StringState.InString, startNewString],
       [DEFAULT]: [StringState.LookForString, noop],
